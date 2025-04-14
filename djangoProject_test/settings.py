@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     # local
 
     'my_first_app.apps.MyFirstAppConfig',
+    'task_manager.apps.TaskManagerConfig',
 ]
 
 MIDDLEWARE = [
