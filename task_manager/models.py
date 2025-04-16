@@ -11,7 +11,12 @@ status_choises = [
 class Category(models.Model):
     name = models.CharField(max_length=100)
 
-    def str(self):
+    class Meta:
+        db_table = 'task_manager_category'
+        verbose_name = "Category"
+        unique_together = ("name",)
+
+    def __str__(self):
         return self.name
 
 class Task(models.Model):
@@ -22,7 +27,13 @@ class Task(models.Model):
     deadline = models.DateTimeField()
     created_at = models.DateTimeField(auto_now_add=True)
 
-    def str(self):
+    class Meta:
+        db_table = 'task_manager_task'
+        ordering = ("-created_at",)
+        verbose_name = "Task"
+        unique_together = ("title",)
+
+    def __str__(self):
         return self.title
 
 
@@ -34,5 +45,11 @@ class SubTask(models.Model):
     deadline = models.DateTimeField()
     created_at = models.DateTimeField(auto_now_add=True)
 
-    def str(self):
+    class Meta:
+        db_table = 'task_manager_subtask'
+        ordering = ("-created_at",)
+        verbose_name = "SubTask"
+        unique_together = ("title",)
+
+    def __str__(self):
         return self.title
