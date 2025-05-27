@@ -1,4 +1,5 @@
 from django.utils import timezone
+from rest_framework.generics import ListAPIView
 from rest_framework.views import APIView
 from rest_framework import generics, status
 from task_manager.models import Task, SubTask
@@ -92,3 +93,43 @@ class SubTaskDetailUpdateDeleteView(APIView):
             return Response({"detail": "Not found."}, status=status.HTTP_404_NOT_FOUND)
         subtask.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+class TaskByWeekdayListAPIView(ListAPIView):
+    serializer_class = TaskSerializer
+
+    def get_queryset(self):
+        queryset = Task.objects.all()
+        weekday = self.request.query_params.get('weekday')
+
+        if weekday:
+            days = {
+                'понеділок': 0,
+                'вівторок': 1,
+                'середа': 2,
+                'четвер': 3,
+                'п’ятниця': 4,
+                'субота': 5,
+                'неділя': 6,
+            }
+            weekday_number = days.get(weekday.lower())
+            if weekday_number is not None:
+                queryset = queryset.filter(deadline__week_day=weekday_number + 1)  # Django: 1 — неділя
+        return queryset
+
+class SubTaskListAPIView(ListAPIView):
+    queryset = SubTask.objects.all().order_by('-created_at')
+    serializer_class = SubTaskSerializer
+
+class FilteredSubTaskListAPIView(ListAPIView):
+    serializer_class = SubTaskSerializer
+
+    def get_queryset(self):
+        queryset = SubTask.objects.all().order_by('-created_at')
+        task_title = self.request.query_params.get('task')
+        status = self.request.query_params.get('status')
+
+        if task_title:
+            queryset = queryset.filter(task__title__icontains=task_title)
+        if status:
+            queryset = queryset.filter(status=status)
+        return queryset

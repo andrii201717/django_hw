@@ -23,7 +23,5 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('greetings/', django_greetings),
     path('user/<str:name>', django_greetings_user),
-    path('admin/', admin.site.urls),
     path('api/', include('task_manager.urls')),
 ]
-
