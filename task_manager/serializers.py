@@ -15,10 +15,11 @@ class SubTaskCreateSerializer(serializers.ModelSerializer):
         read_only_fields = ['created_at']
 
 
-class CategoryCreateSerializer(serializers.ModelSerializer):
+class CategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = Category
-        fields = ['id', 'name']
+        fields = '__all__'
+        read_only_fields = ['is_deleted', 'deleted_at']
 
     def validate_name(self, value):
 

@@ -1,4 +1,5 @@
 from django.db import models
+from django.utils import timezone
 
 status_choises = [
         ("New", "New"),
@@ -8,16 +9,26 @@ status_choises = [
         ("Done", "Done")
     ]
 
-class Category(models.Model):
-    name = models.CharField(max_length=100)
+class CategoryManager(models.Manager):
+    def get_queryset(self):
+        return super().get_queryset().filter(is_deleted=False)
 
-    class Meta:
-        db_table = 'task_manager_category'
-        verbose_name = "Category"
-        unique_together = ("name",)
+class Category(models.Model):
+    name = models.CharField(max_length=255)
+    is_deleted = models.BooleanField(default=False)
+    deleted_at = models.DateTimeField(null=True, blank=True)
+
+    objects = CategoryManager()  # Менеджер по замовчуванню — тільки не видалені
+    all_objects = models.Manager()  # Менеджер для всіх, включаючи видалені
+
+    def delete(self, using=None, keep_parents=False):
+        self.is_deleted = True
+        self.deleted_at = timezone.now()
+        self.save()
 
     def __str__(self):
         return self.name
+
 
 class Task(models.Model):
     title = models.CharField(max_length=50, unique_for_date="deadline")

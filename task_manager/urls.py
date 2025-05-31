@@ -2,6 +2,12 @@ from django.urls import path
 from task_manager.views import TaskCreateView, TaskListView, TaskDetailView, TaskStatsView, \
     SubTaskDetailUpdateDeleteView, SubTaskListCreateView, TaskByWeekdayListAPIView, SubTaskListAPIView, \
     FilteredSubTaskListAPIView, TaskListCreateView, TaskRetrieveUpdateDestroyView, SubTaskRetrieveUpdateDestroyView
+from rest_framework.routers import DefaultRouter
+from task_manager.views import CategoryViewSet
+
+router = DefaultRouter()
+router.register(r'categories', CategoryViewSet, basename='category')
+
 
 urlpatterns = [
     path('tasks/create/', TaskCreateView.as_view(), name='task-create'),
@@ -17,4 +23,5 @@ urlpatterns = [
 
     path('subtasks/', SubTaskListCreateView.as_view(), name='subtask-list-create'),
     path('subtasks/<int:pk>/', SubTaskRetrieveUpdateDestroyView.as_view(), name='subtask-detail'),
+    *router.urls
 ]

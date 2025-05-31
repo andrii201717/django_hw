@@ -1,11 +1,15 @@
 from django.utils import timezone
+from rest_framework.decorators import action
 from rest_framework.generics import ListAPIView, ListCreateAPIView, RetrieveUpdateDestroyAPIView
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.views import APIView
 from rest_framework import generics, status#
 from rest_framework.filters import SearchFilter, OrderingFilter
-from task_manager.models import Task, SubTask
-from task_manager.serializers import TaskSerializer, TaskCreateSerializer, SubTaskCreateSerializer, SubTaskSerializer
+from rest_framework.viewsets import ModelViewSet
+
+from task_manager.models import Task, SubTask, Category
+from task_manager.serializers import TaskSerializer, TaskCreateSerializer, SubTaskCreateSerializer, SubTaskSerializer, \
+    CategorySerializer
 from rest_framework.response import Response
 from django.db import models
 
@@ -147,3 +151,14 @@ class FilteredSubTaskListAPIView(ListAPIView):
         if status:
             queryset = queryset.filter(status=status)
         return queryset
+
+
+class CategoryViewSet(ModelViewSet):
+    queryset = Category.objects.all()
+    serializer_class = CategorySerializer
+
+    @action(detail=True, methods=['get'])
+    def count_tasks(self, request, pk=None):
+        category = self.get_object()
+        task_count = Task.objects.filter(category=category).count()
+        return Response({'category': category.name, 'task_count': task_count})
