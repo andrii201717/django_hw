@@ -1,41 +1,90 @@
 from django.utils import timezone
+from django.db import models
+from django.contrib.auth.models import User
+from rest_framework import generics, status
 from rest_framework.decorators import action
-from rest_framework.generics import ListAPIView, ListCreateAPIView, RetrieveUpdateDestroyAPIView
-from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework.views import APIView
-from rest_framework import generics, status#
 from rest_framework.filters import SearchFilter, OrderingFilter
+from rest_framework.generics import (
+    ListCreateAPIView,
+    RetrieveUpdateDestroyAPIView,
+    ListAPIView,
+    CreateAPIView,
+)
+from rest_framework.permissions import AllowAny, IsAuthenticated, BasePermission
+from rest_framework.response import Response
+from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet
+from rest_framework.serializers import ModelSerializer
+from django_filters.rest_framework import DjangoFilterBackend
 
 from task_manager.models import Task, SubTask, Category
-from task_manager.serializers import TaskSerializer, TaskCreateSerializer, SubTaskCreateSerializer, SubTaskSerializer, \
-    CategorySerializer
-from rest_framework.response import Response
-from django.db import models
+from task_manager.serializers import (
+    TaskSerializer,
+    TaskCreateSerializer,
+    SubTaskSerializer,
+    SubTaskCreateSerializer,
+    CategorySerializer,
+)
 
-class TaskCreateView(generics.CreateAPIView):
-    queryset = Task.objects.all()
-    serializer_class = TaskSerializer
 
+# --- Permissions ---
+class IsOwner(BasePermission):
+    def has_object_permission(self, request, view, obj):
+        return obj.user == request.user
+
+
+# --- User Registration ---
+class RegisterSerializer(ModelSerializer):
+    class Meta:
+        model = User
+        fields = ('username', 'password', 'email')
+        extra_kwargs = {'password': {'write_only': True}}
+
+    def create(self, validated_data):
+        user = User.objects.create_user(**validated_data)
+        return user
+
+
+class RegisterView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = RegisterSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response({"message": "User created"}, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+# --- Task Views ---
 class TaskListView(generics.ListAPIView):
     queryset = Task.objects.all()
     serializer_class = TaskSerializer
+    permission_classes = [AllowAny]
 
 
-class TaskDetailView(generics.RetrieveAPIView):
+class TaskCreateView(CreateAPIView):
+    queryset = Task.objects.all()
+    serializer_class = TaskCreateSerializer
+    permission_classes = [IsAuthenticated]
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+
+class TaskRetrieveUpdateDestroyView(RetrieveUpdateDestroyAPIView):
     queryset = Task.objects.all()
     serializer_class = TaskSerializer
+    permission_classes = [IsAuthenticated, IsOwner]
+
 
 class TaskStatsView(APIView):
+    permission_classes = [IsAuthenticated]
+
     def get(self, request):
         total_tasks = Task.objects.count()
-
-
         status_counts = Task.objects.values('status').order_by().annotate(count=models.Count('status'))
-
         status_summary = {item['status']: item['count'] for item in status_counts}
-
-
         overdue_tasks = Task.objects.filter(deadline__lt=timezone.now()).count()
 
         data = {
@@ -49,39 +98,62 @@ class TaskStatsView(APIView):
 class TaskListCreateView(ListCreateAPIView):
     queryset = Task.objects.all()
     serializer_class = TaskSerializer
+    permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ['status', 'deadline']
     search_fields = ['title', 'description']
     ordering_fields = ['created_at']
     ordering = ['created_at']
 
-class TaskRetrieveUpdateDestroyView(RetrieveUpdateDestroyAPIView):
-    queryset = Task.objects.all()
+
+class TaskByWeekdayListAPIView(ListAPIView):
     serializer_class = TaskSerializer
+    permission_classes = [AllowAny]
+
+    def get_queryset(self):
+        queryset = Task.objects.all()
+        weekday = self.request.query_params.get('weekday')
+
+        if weekday:
+            days = {
+                'понеділок': 0,
+                'вівторок': 1,
+                'середа': 2,
+                'четвер': 3,
+                'п’ятниця': 4,
+                'субота': 5,
+                'неділя': 6,
+            }
+            weekday_number = days.get(weekday.lower())
+            if weekday_number is not None:
+                queryset = queryset.filter(deadline__week_day=weekday_number + 1)  # Django: 1 — неділя
+        return queryset
 
 
-class TaskCreateView(APIView):
-    def post(self, request):
-        serializer = TaskCreateSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
+# --- SubTask Views ---
 class SubTaskListCreateView(ListCreateAPIView):
     queryset = SubTask.objects.all()
     serializer_class = SubTaskSerializer
+    permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, SearchFilter, OrderingFilter]
     filterset_fields = ['status', 'deadline']
     search_fields = ['title', 'description']
     ordering_fields = ['created_at']
     ordering = ['created_at']
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
 
 class SubTaskRetrieveUpdateDestroyView(RetrieveUpdateDestroyAPIView):
     queryset = SubTask.objects.all()
     serializer_class = SubTaskSerializer
+    permission_classes = [IsAuthenticated, IsOwner]
+
 
 class SubTaskDetailUpdateDeleteView(APIView):
+    permission_classes = [IsAuthenticated, IsOwner]
+
     def get_object(self, pk):
         try:
             return SubTask.objects.get(pk=pk)
@@ -112,34 +184,16 @@ class SubTaskDetailUpdateDeleteView(APIView):
         subtask.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-class TaskByWeekdayListAPIView(ListAPIView):
-    serializer_class = TaskSerializer
-
-    def get_queryset(self):
-        queryset = Task.objects.all()
-        weekday = self.request.query_params.get('weekday')
-
-        if weekday:
-            days = {
-                'понеділок': 0,
-                'вівторок': 1,
-                'середа': 2,
-                'четвер': 3,
-                'п’ятниця': 4,
-                'субота': 5,
-                'неділя': 6,
-            }
-            weekday_number = days.get(weekday.lower())
-            if weekday_number is not None:
-                queryset = queryset.filter(deadline__week_day=weekday_number + 1)  # Django: 1 — неділя
-        return queryset
 
 class SubTaskListAPIView(ListAPIView):
     queryset = SubTask.objects.all().order_by('-created_at')
     serializer_class = SubTaskSerializer
+    permission_classes = [AllowAny]
+
 
 class FilteredSubTaskListAPIView(ListAPIView):
     serializer_class = SubTaskSerializer
+    permission_classes = [AllowAny]
 
     def get_queryset(self):
         queryset = SubTask.objects.all().order_by('-created_at')
@@ -153,9 +207,11 @@ class FilteredSubTaskListAPIView(ListAPIView):
         return queryset
 
 
+# --- Category ViewSet ---
 class CategoryViewSet(ModelViewSet):
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
+    permission_classes = [IsAuthenticated]
 
     @action(detail=True, methods=['get'])
     def count_tasks(self, request, pk=None):
