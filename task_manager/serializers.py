@@ -3,9 +3,11 @@ from task_manager.models import Task, SubTask, Category
 from django.utils import timezone
 
 class TaskSerializer(serializers.ModelSerializer):
+    owner = serializers.ReadOnlyField(source='owner.username')
+
     class Meta:
         model = Task
-        fields = ['id', 'title', 'description', 'status', 'deadline']
+        fields = ['id', 'title', 'description', 'owner']
 
 
 class SubTaskCreateSerializer(serializers.ModelSerializer):
@@ -41,9 +43,11 @@ class CategorySerializer(serializers.ModelSerializer):
         return instance
 
 class SubTaskSerializer(serializers.ModelSerializer):
+    owner = serializers.ReadOnlyField(source='owner.username')
+
     class Meta:
         model = SubTask
-        fields = '__all__'
+        fields = ['id', 'title', 'task', 'owner']
 
 
 class TaskDetailSerializer(serializers.ModelSerializer):

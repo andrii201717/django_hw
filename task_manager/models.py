@@ -1,5 +1,6 @@
 from django.db import models
 from django.utils import timezone
+from django.conf import settings
 
 status_choises = [
         ("New", "New"),
@@ -37,6 +38,11 @@ class Task(models.Model):
     status = models.CharField(max_length=100, choices=status_choises)
     deadline = models.DateTimeField()
     created_at = models.DateTimeField(auto_now_add=True)
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='tasks'
+    )
 
     class Meta:
         db_table = 'task_manager_task'
@@ -49,6 +55,7 @@ class Task(models.Model):
 
 
 
+
 class SubTask(models.Model):
     title = models.CharField(max_length=50)
     description = models.TextField()
@@ -56,6 +63,11 @@ class SubTask(models.Model):
     status = models.CharField(max_length=100, choices=status_choises)
     deadline = models.DateTimeField()
     created_at = models.DateTimeField(auto_now_add=True)
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='subtasks'
+    )
 
     class Meta:
         db_table = 'task_manager_subtask'
