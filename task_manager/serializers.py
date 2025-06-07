@@ -1,4 +1,8 @@
+from django.contrib.auth.models import User
+from django.contrib.auth.password_validation import validate_password
 from rest_framework import serializers
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+
 from task_manager.models import Task, SubTask, Category
 from django.utils import timezone
 
@@ -50,6 +54,25 @@ class SubTaskSerializer(serializers.ModelSerializer):
         fields = ['id', 'title', 'task', 'owner']
 
 
+class RegisterSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True, validators=[validate_password])
+    password2 = serializers.CharField(write_only=True)
+
+    class Meta:
+        model = User
+        fields = ('username', 'email', 'password', 'password2')
+
+    def validate(self, data):
+        if data['password'] != data['password2']:
+            raise serializers.ValidationError({"password": "Passwords do not match"})
+        return data
+
+    def create(self, validated_data):
+        validated_data.pop('password2')
+        user = User.objects.create_user(**validated_data)
+        return user
+
+
 class TaskDetailSerializer(serializers.ModelSerializer):
     subtasks = SubTaskSerializer(many=True, read_only=True)  # пов’язано через related_name='subtasks'
 
@@ -67,3 +90,10 @@ class TaskCreateSerializer(serializers.ModelSerializer):
         if value < timezone.now():
             raise serializers.ValidationError("Дедлайн не може бути в минулому.")
         return value
+
+
+class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    def validate(self, attrs):
+        data = super().validate(attrs)
+        data.update({'username': self.user.username})
+        return data

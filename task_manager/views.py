@@ -1,11 +1,14 @@
+from django.contrib.auth.models import User
 from django.utils import timezone
 from django.db.models import Count
-from rest_framework import generics, status
+from rest_framework import generics, status, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.filters import SearchFilter, OrderingFilter
 from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.views import TokenObtainPairView
 
 from task_manager.models import Task, SubTask, Category
 from task_manager.serializers import (
@@ -13,7 +16,7 @@ from task_manager.serializers import (
     TaskCreateSerializer,
     SubTaskSerializer,
     SubTaskCreateSerializer,
-    CategorySerializer,
+    CategorySerializer, RegisterSerializer, CustomTokenObtainPairSerializer,
 )
 from task_manager.permissions import IsOwner
 from rest_framework.viewsets import ModelViewSet
@@ -147,3 +150,26 @@ class CategoryViewSet(ModelViewSet):
         category = self.get_object()
         task_count = Task.objects.filter(category=category).count()
         return Response({'category': category.name, 'task_count': task_count})
+
+
+class RegisterView(generics.CreateAPIView):
+    queryset = User.objects.all()
+    serializer_class = RegisterSerializer
+    permission_classes = [AllowAny]
+
+
+class CustomLoginView(TokenObtainPairView):
+    serializer_class = CustomTokenObtainPairSerializer
+
+
+class LogoutView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        try:
+            refresh_token = request.data["refresh"]
+            token = RefreshToken(refresh_token)
+            token.blacklist()
+            return Response(status=status.HTTP_205_RESET_CONTENT)
+        except Exception:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
